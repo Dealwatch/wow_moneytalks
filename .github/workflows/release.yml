@@ -9,8 +9,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Selbsttest
-        run: sudo apt-get install -y -q lua5.1 && lua5.1 tests/core_test.lua
+      - name: Tests
+        run: |
+          sudo apt-get install -y -q lua5.1
+          for t in tests/*_test.lua; do lua5.1 "$t"; done
       - name: Zip bauen und Release anlegen
         env:
           GH_TOKEN: ${{ github.token }}
