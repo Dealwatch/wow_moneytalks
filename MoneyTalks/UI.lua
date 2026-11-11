@@ -1,12 +1,16 @@
 local ADDON, ns = ...
 
 local ROW_HEIGHT, ICON_SIZE = 18, 14
-local NAME_WIDTH, MONEY_WIDTH, WHERE_WIDTH = 180, 88, 66
-local LIST_WIDTH = NAME_WIDTH + 3 * MONEY_WIDTH + WHERE_WIDTH
+local NAME_WIDTH, MONEY_WIDTH, WHERE_WIDTH, PROFIT_WIDTH, MARK_WIDTH = 180, 88, 58, 84, 12
+local LIST_WIDTH = NAME_WIDTH + 2 * MONEY_WIDTH + WHERE_WIDTH + PROFIT_WIDTH + MARK_WIDTH
 local WIDTH = LIST_WIDTH + 50
 
 local function AHPrice(itemID)
   return Auctionator.API.v1.GetAuctionPriceByItemID(ADDON, itemID)
+end
+
+local function AHAge(itemID)
+  return Auctionator.API.v1.GetAuctionAgeByItemID(ADDON, itemID)
 end
 
 -- Auctionator merkt sich Haendlerpreise, sobald man den Haendler einmal besucht hat.
@@ -22,6 +26,11 @@ local function VendorSellPrice(itemID)
   return price
 end
 
+-- Preisquellen fuer Core.lua; producers wird in ReadRecipes gesetzt
+local ctx = {
+  ahPrice = AHPrice, ahAge = AHAge, vendorPrice = VendorPrice, vendorSellPrice = VendorSellPrice,
+}
+
 -- copper = nil/false ergibt ein graues "?": das einzige Zeichen fuer "Preis fehlt"
 local function Money(copper, color)
   if not copper then return GRAY_FONT_COLOR:WrapTextInColorCode("?") end
@@ -35,9 +44,14 @@ local function ProfitText(profit)
   return Money(profit, profit and (profit > 0 and GREEN_FONT_COLOR or profit < 0 and RED_FONT_COLOR))
 end
 
--- Liest alle gelernten Rezepte des gerade offenen Berufs.
+-- Liest alle gelernten Rezepte des gerade offenen Berufs und merkt sie sich pro Charakter
+-- (MoneyTalksRecipes), damit Zwischenprodukte aus anderen Berufen erkannt werden.
 local function ReadRecipes()
   local rows = {}
+  MoneyTalksRecipes = MoneyTalksRecipes or {}
+  -- Rezepte aus Chat-Links, der Gilde oder von NPCs gehoeren nicht dem Charakter
+  local own = not (C_TradeSkillUI.IsNPCCrafting() or C_TradeSkillUI.IsTradeSkillLinked()
+    or C_TradeSkillUI.IsTradeSkillGuild())
   -- GetFilteredRecipeIDs nutzt Blizzards eigenes Fenster (beachtet aber dessen Suchfilter)
   local getIDs = C_TradeSkillUI.GetAllRecipeIDs or C_TradeSkillUI.GetFilteredRecipeIDs
   for _, recipeID in ipairs(getIDs() or {}) do
@@ -56,13 +70,16 @@ local function ReadRecipes()
         outputQty = (schematic.quantityMin + schematic.quantityMax) / 2,
         reagents = reagents,
       }
-      rows[#rows + 1] = {
-        recipeID = recipeID,
-        name = info.name,
-        icon = info.icon,
-        result = ns.Evaluate(recipe, AHPrice, VendorPrice, VendorSellPrice),
-      }
+      rows[#rows + 1] = { recipeID = recipeID, name = info.name, icon = info.icon, recipe = recipe }
+      if own then MoneyTalksRecipes[recipeID] = recipe end
+    elseif own then
+      MoneyTalksRecipes[recipeID] = nil -- nicht (mehr) gelernt
     end
+  end
+  -- erst jetzt rechnen: Zwischenprodukte brauchen die vollstaendige Rezeptsammlung
+  ctx.producers = ns.BuildProducers(MoneyTalksRecipes)
+  for _, row in ipairs(rows) do
+    row.result = ns.Evaluate(row.recipe, ctx)
   end
   ns.SortByProfit(rows)
   return rows
@@ -80,7 +97,8 @@ local function Column(row, font, width, justify, leftOf, gap)
   return fs
 end
 
--- Spalten: Symbol + Rezept | Kosten | Erloes | Verkauf (AH/Haendler) | Gewinn
+-- Spalten: Symbol + Rezept | Kosten | Erloes | Verkauf (AH/Haendler) | Gewinn | "~"
+-- Das "~" hat eine eigene schmale Spalte, damit die Betraege buendig bleiben.
 local function CreateRow(parent, frameType, font)
   local row = CreateFrame(frameType, nil, parent)
   row:SetSize(LIST_WIDTH, ROW_HEIGHT)
@@ -91,8 +109,35 @@ local function CreateRow(parent, frameType, font)
   row.cost = Column(row, font, MONEY_WIDTH, "RIGHT", row.name)
   row.value = Column(row, font, MONEY_WIDTH, "RIGHT", row.cost)
   row.where = Column(row, font, WHERE_WIDTH, "RIGHT", row.value)
-  row.profit = Column(row, font, MONEY_WIDTH, "RIGHT", row.where)
+  row.profit = Column(row, font, PROFIT_WIDTH, "RIGHT", row.where)
+  row.mark = Column(row, font, MARK_WIDTH, "RIGHT", row.profit)
   return row
+end
+
+local function AgeText(age)
+  return age and ("%d Tage alt"):format(age) or "Alter unbekannt"
+end
+
+-- Grauer Zusatz hinter einem Material: woher es am billigsten kommt, ob der Preis alt ist
+local function ReagentNote(r)
+  local note
+  if r.source == "vendor" then
+    note = "Händler"
+  elseif r.source == "craft" then
+    note = r.old and "selbst herstellen, Preis alt" or "selbst herstellen"
+  elseif r.old then
+    note = AgeText(r.age)
+  end
+  return note and GRAY_FONT_COLOR:WrapTextInColorCode(" " .. note) or ""
+end
+
+-- Zeile im unteren Tooltip-Teil: Beschriftung gold, Betrag weiss; dim = ausgegraut
+local function SummaryLine(label, value, dim)
+  if dim then
+    GameTooltip:AddDoubleLine(label, value, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5)
+  else
+    GameTooltip:AddDoubleLine(label, value, 1, 0.82, 0, 1, 1, 1)
+  end
 end
 
 local function ShowTooltip(row)
@@ -102,15 +147,18 @@ local function ShowTooltip(row)
   for _, r in ipairs(result.reagents) do
     local name = C_Item.GetItemNameByID(r.itemID) or ("item:" .. r.itemID)
     GameTooltip:AddDoubleLine(
-      r.qty .. "x " .. name .. (r.fromVendor and " (Händler)" or ""),
-      Money(r.unit and r.unit * r.qty), 1, 1, 1, 1, 1, 1)
+      r.qty .. "x " .. name .. ReagentNote(r), Money(r.unit and r.unit * r.qty), 1, 1, 1, 1, 1, 1)
   end
   GameTooltip:AddLine(" ")
-  GameTooltip:AddDoubleLine("Kosten", Money(not result.costIncomplete and result.cost))
-  GameTooltip:AddDoubleLine("Erlös im AH (nach 5 % Gebühr)", Money(result.ahValue))
-  GameTooltip:AddDoubleLine("Erlös beim Händler", Money(result.vendorValue))
-  GameTooltip:AddDoubleLine("Gewinn", ProfitText(result.profit))
-  GameTooltip:AddLine("Klick: Rezept anzeigen", 0.5, 0.5, 0.5)
+  SummaryLine("Kosten", Money(not result.costIncomplete and result.cost))
+  -- der schlechtere der beiden Verkaufswege wird ausgegraut
+  local ahNote = "abzgl. 5 %" .. (result.ahValueOld and ", " .. AgeText(result.ahValueAge) or "")
+  SummaryLine("Erlös im AH" .. GRAY_FONT_COLOR:WrapTextInColorCode(" " .. ahNote),
+    Money(result.ahValue), result.sellToVendor)
+  SummaryLine("Erlös beim Händler", Money(result.vendorValue), result.value and not result.sellToVendor)
+  SummaryLine("Gewinn", ProfitText(result.profit))
+  GameTooltip:AddLine(" ")
+  GameTooltip:AddLine("Klick zeigt das Rezept", 0.5, 0.5, 0.5)
   GameTooltip:Show()
 end
 
@@ -118,6 +166,7 @@ local function CreateListRow(index)
   local row = CreateRow(content, "Button", "GameFontHighlightSmall")
   row:SetPoint("TOPLEFT", 0, -(index - 1) * ROW_HEIGHT)
   row.where:SetTextColor(0.6, 0.6, 0.6)
+  row.mark:SetTextColor(0.5, 0.5, 0.5)
   if index % 2 == 0 then
     local stripe = row:CreateTexture(nil, "BACKGROUND")
     stripe:SetAllPoints()
@@ -150,6 +199,8 @@ local function Refresh()
     row.value:SetText(Money(result.value))
     row.where:SetText(result.value and (result.sellToVendor and "Händler" or "AH") or "")
     row.profit:SetText(ProfitText(result.profit))
+    -- "~" = der Gewinn beruht auf einem alten AH-Preis
+    row.mark:SetText(result.profit and result.stale and "~" or "")
     row:Show()
     if result.profit and result.profit > 0 then profitable = profitable + 1 end
     anyAHPrice = anyAHPrice or result.ahValue ~= nil
@@ -162,7 +213,7 @@ local function Refresh()
   if #rows == 0 then
     status:SetText("Keine gelernten Rezepte gefunden.")
   elseif not anyAHPrice then
-    status:SetText("Noch keine AH-Preise: Auktionshaus öffnen und scannen.")
+    status:SetText("Keine AH-Preise: bitte im Auktionshaus scannen.")
   else
     status:SetText(("Gewinn bei %d von %d Rezepten"):format(profitable, #rows))
   end
@@ -210,7 +261,7 @@ local function CreateMainFrame()
   status:SetPoint("BOTTOMLEFT", 16, 11)
   local legend = frame:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
   legend:SetPoint("BOTTOMRIGHT", -16, 11)
-  legend:SetText("? = Preis fehlt")
+  legend:SetText("? = Preis fehlt    ~ = Preis alt")
 
   -- neu rechnen, sobald Auctionator nach einem Scan neue Preise hat
   Auctionator.API.v1.RegisterForDBUpdate(ADDON, QueueRefresh)
@@ -245,6 +296,14 @@ end)
 
 -- "/mt" ist von Blizzard belegt (Main Tank)
 SLASH_MONEYTALKS1, SLASH_MONEYTALKS2 = "/moneytalks", "/mtalk"
-SlashCmdList.MONEYTALKS = function()
-  if frame and frame:IsShown() then frame:Hide() else Open() end
+SlashCmdList.MONEYTALKS = function(msg)
+  if msg == "reset" then
+    -- z. B. nach dem Verlernen eines Berufs, dessen Rezepte sonst gemerkt bleiben
+    MoneyTalksRecipes = {}
+    print("MoneyTalks: Gemerkte Rezepte gelöscht. Öffne deine Berufe, um sie neu einzulesen.")
+  elseif frame and frame:IsShown() then
+    frame:Hide()
+  else
+    Open()
+  end
 end
