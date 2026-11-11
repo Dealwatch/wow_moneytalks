@@ -1,0 +1,22 @@
+# Manuell starten: GitHub -> Actions -> Release -> "Run workflow".
+# Die Versionsnummer kommt aus MoneyTalks/MoneyTalks.toc (## Version).
+name: Release
+on: workflow_dispatch
+permissions:
+  contents: write
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Selbsttest
+        run: sudo apt-get install -y -q lua5.1 && lua5.1 tests/core_test.lua
+      - name: Zip bauen und Release anlegen
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          version=$(sed -n 's/^## Version: //p' MoneyTalks/MoneyTalks.toc | tr -d '\r')
+          # WowUp erkennt Forever-Addons nur an der Endung "-forever.zip"
+          zip -r "MoneyTalks-v$version-forever.zip" MoneyTalks
+          gh release create "v$version" "MoneyTalks-v$version-forever.zip" \
+            --target "$GITHUB_SHA" --title "MoneyTalks v$version" --generate-notes
