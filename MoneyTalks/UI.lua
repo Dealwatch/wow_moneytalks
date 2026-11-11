@@ -1,8 +1,8 @@
 local ADDON, ns = ...
 
 local ROW_HEIGHT, ICON_SIZE = 18, 14
-local NAME_WIDTH, MONEY_WIDTH, WHERE_WIDTH = 180, 88, 66
-local LIST_WIDTH = NAME_WIDTH + 3 * MONEY_WIDTH + WHERE_WIDTH
+local NAME_WIDTH, MONEY_WIDTH, WHERE_WIDTH, PROFIT_WIDTH, MARK_WIDTH = 180, 88, 58, 84, 12
+local LIST_WIDTH = NAME_WIDTH + 2 * MONEY_WIDTH + WHERE_WIDTH + PROFIT_WIDTH + MARK_WIDTH
 local WIDTH = LIST_WIDTH + 50
 
 local function AHPrice(itemID)
@@ -97,7 +97,8 @@ local function Column(row, font, width, justify, leftOf, gap)
   return fs
 end
 
--- Spalten: Symbol + Rezept | Kosten | Erloes | Verkauf (AH/Haendler) | Gewinn
+-- Spalten: Symbol + Rezept | Kosten | Erloes | Verkauf (AH/Haendler) | Gewinn | "~"
+-- Das "~" hat eine eigene schmale Spalte, damit die Betraege buendig bleiben.
 local function CreateRow(parent, frameType, font)
   local row = CreateFrame(frameType, nil, parent)
   row:SetSize(LIST_WIDTH, ROW_HEIGHT)
@@ -108,19 +109,35 @@ local function CreateRow(parent, frameType, font)
   row.cost = Column(row, font, MONEY_WIDTH, "RIGHT", row.name)
   row.value = Column(row, font, MONEY_WIDTH, "RIGHT", row.cost)
   row.where = Column(row, font, WHERE_WIDTH, "RIGHT", row.value)
-  row.profit = Column(row, font, MONEY_WIDTH, "RIGHT", row.where)
+  row.profit = Column(row, font, PROFIT_WIDTH, "RIGHT", row.where)
+  row.mark = Column(row, font, MARK_WIDTH, "RIGHT", row.profit)
   return row
 end
 
-local function AgeNote(age)
-  return age and (" (%d Tage alt)"):format(age) or " (Alter unbekannt)"
+local function AgeText(age)
+  return age and ("%d Tage alt"):format(age) or "Alter unbekannt"
 end
 
--- Hinweis hinter einem Material: woher es am billigsten kommt und ob der Preis alt ist
+-- Grauer Zusatz hinter einem Material: woher es am billigsten kommt, ob der Preis alt ist
 local function ReagentNote(r)
-  if r.source == "vendor" then return " (Händler)" end
-  if r.source == "craft" then return r.old and " (selbst herstellen, Preis alt)" or " (selbst herstellen)" end
-  return r.old and AgeNote(r.age) or ""
+  local note
+  if r.source == "vendor" then
+    note = "Händler"
+  elseif r.source == "craft" then
+    note = r.old and "selbst herstellen, Preis alt" or "selbst herstellen"
+  elseif r.old then
+    note = AgeText(r.age)
+  end
+  return note and GRAY_FONT_COLOR:WrapTextInColorCode(" " .. note) or ""
+end
+
+-- Zeile im unteren Tooltip-Teil: Beschriftung gold, Betrag weiss; dim = ausgegraut
+local function SummaryLine(label, value, dim)
+  if dim then
+    GameTooltip:AddDoubleLine(label, value, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5)
+  else
+    GameTooltip:AddDoubleLine(label, value, 1, 0.82, 0, 1, 1, 1)
+  end
 end
 
 local function ShowTooltip(row)
@@ -130,17 +147,18 @@ local function ShowTooltip(row)
   for _, r in ipairs(result.reagents) do
     local name = C_Item.GetItemNameByID(r.itemID) or ("item:" .. r.itemID)
     GameTooltip:AddDoubleLine(
-      r.qty .. "x " .. name .. ReagentNote(r),
-      Money(r.unit and r.unit * r.qty), 1, 1, 1, 1, 1, 1)
+      r.qty .. "x " .. name .. ReagentNote(r), Money(r.unit and r.unit * r.qty), 1, 1, 1, 1, 1, 1)
   end
   GameTooltip:AddLine(" ")
-  GameTooltip:AddDoubleLine("Kosten", Money(not result.costIncomplete and result.cost))
-  GameTooltip:AddDoubleLine(
-    "Erlös im AH (nach 5 % Gebühr)" .. (result.ahValueOld and AgeNote(result.ahValueAge) or ""),
-    Money(result.ahValue))
-  GameTooltip:AddDoubleLine("Erlös beim Händler", Money(result.vendorValue))
-  GameTooltip:AddDoubleLine("Gewinn", ProfitText(result.profit))
-  GameTooltip:AddLine("Klick: Rezept anzeigen", 0.5, 0.5, 0.5)
+  SummaryLine("Kosten", Money(not result.costIncomplete and result.cost))
+  -- der schlechtere der beiden Verkaufswege wird ausgegraut
+  local ahNote = "abzgl. 5 %" .. (result.ahValueOld and ", " .. AgeText(result.ahValueAge) or "")
+  SummaryLine("Erlös im AH" .. GRAY_FONT_COLOR:WrapTextInColorCode(" " .. ahNote),
+    Money(result.ahValue), result.sellToVendor)
+  SummaryLine("Erlös beim Händler", Money(result.vendorValue), result.value and not result.sellToVendor)
+  SummaryLine("Gewinn", ProfitText(result.profit))
+  GameTooltip:AddLine(" ")
+  GameTooltip:AddLine("Klick zeigt das Rezept", 0.5, 0.5, 0.5)
   GameTooltip:Show()
 end
 
@@ -148,6 +166,7 @@ local function CreateListRow(index)
   local row = CreateRow(content, "Button", "GameFontHighlightSmall")
   row:SetPoint("TOPLEFT", 0, -(index - 1) * ROW_HEIGHT)
   row.where:SetTextColor(0.6, 0.6, 0.6)
+  row.mark:SetTextColor(0.5, 0.5, 0.5)
   if index % 2 == 0 then
     local stripe = row:CreateTexture(nil, "BACKGROUND")
     stripe:SetAllPoints()
@@ -179,9 +198,9 @@ local function Refresh()
     row.cost:SetText(Money(not result.costIncomplete and result.cost))
     row.value:SetText(Money(result.value))
     row.where:SetText(result.value and (result.sellToVendor and "Händler" or "AH") or "")
+    row.profit:SetText(ProfitText(result.profit))
     -- "~" = der Gewinn beruht auf einem alten AH-Preis
-    local staleMark = result.profit and result.stale and GRAY_FONT_COLOR:WrapTextInColorCode("~ ") or ""
-    row.profit:SetText(staleMark .. ProfitText(result.profit))
+    row.mark:SetText(result.profit and result.stale and "~" or "")
     row:Show()
     if result.profit and result.profit > 0 then profitable = profitable + 1 end
     anyAHPrice = anyAHPrice or result.ahValue ~= nil

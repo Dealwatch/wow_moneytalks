@@ -5,7 +5,8 @@ Geld bringen und welche Geld kosten. Die Preise kommen von Auctionator.
 
 ![Vorschau der Liste](docs/vorschau.png)
 
-*Nachgebaute Vorschau mit Beispieldaten, kein Spiel-Screenshot.*
+*Nachgebaute Vorschau mit Beispieldaten, kein Spiel-Screenshot. Rechts der Tooltip der
+markierten Zeile.*
 
 ## Die Liste lesen
 
@@ -19,11 +20,12 @@ Die Liste ist nach Gewinn sortiert, der beste Tipp steht oben.
 | Gewinn | Erlös minus Kosten. Grün ist Gewinn, rot ist Verlust. |
 
 - `?` heißt, dass ein Preis fehlt. Solche Rezepte stehen grau am Ende.
-- `~` vor dem Gewinn heißt, dass ein verwendeter AH-Preis älter als 3 Tage ist. Der
+- `~` hinter dem Gewinn heißt, dass ein verwendeter AH-Preis älter als 3 Tage ist. Der
   Gewinn ist dann weniger verlässlich.
 - Mit der Maus über einer Zeile siehst du die Kosten pro Material und beide Erlöse.
-  Hinter jedem Material steht, woher es am billigsten kommt: aus dem AH, vom `Händler`
-  oder `selbst herstellen`. Bei alten Preisen steht dort auch das Alter.
+  Hinter jedem Material steht in Grau, woher es am billigsten kommt (`Händler`,
+  `selbst herstellen`) und wie alt ein alter Preis ist. Der schlechtere der beiden
+  Verkaufswege ist ausgegraut.
 - Ein Klick auf eine Zeile zeigt das Rezept im Berufsfenster.
 - `/moneytalks` (kurz `/mtalk`) blendet die Liste ein und aus.
 
