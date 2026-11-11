@@ -1,8 +1,9 @@
 ## Interface: 16001
 ## Title: MoneyTalks
 ## Notes: Zeigt fuer alle gelernten Rezepte Materialkosten, Verkaufswert (AH oder Haendler) und Gewinn (Preise von Auctionator).
-## Version: 0.2.0
+## Version: 0.3.0
 ## Dependencies: Auctionator
+## SavedVariablesPerCharacter: MoneyTalksRecipes
 
 Core.lua
 UI.lua

@@ -13,13 +13,17 @@ Die Liste ist nach Gewinn sortiert, der beste Tipp steht oben.
 
 | Spalte | Bedeutung |
 |---|---|
-| Kosten | Was alle Materialien zusammen kosten. Ist ein Material beim Händler billiger als im AH, zählt der Händlerpreis. |
+| Kosten | Was alle Materialien zusammen kosten, jeweils über den billigsten Weg: AH, Händler oder selbst herstellen. |
 | Erlös | Was das Endprodukt einbringt, über den besseren der beiden Wege. |
 | Verkauf | `AH` oder `Händler`: wo du mehr bekommst. Beim AH sind die 5 % Gebühr schon abgezogen. |
 | Gewinn | Erlös minus Kosten. Grün ist Gewinn, rot ist Verlust. |
 
 - `?` heißt, dass ein Preis fehlt. Solche Rezepte stehen grau am Ende.
+- `~` vor dem Gewinn heißt, dass ein verwendeter AH-Preis älter als 3 Tage ist. Der
+  Gewinn ist dann weniger verlässlich.
 - Mit der Maus über einer Zeile siehst du die Kosten pro Material und beide Erlöse.
+  Hinter jedem Material steht, woher es am billigsten kommt: aus dem AH, vom `Händler`
+  oder `selbst herstellen`. Bei alten Preisen steht dort auch das Alter.
 - Ein Klick auf eine Zeile zeigt das Rezept im Berufsfenster.
 - `/moneytalks` (kurz `/mtalk`) blendet die Liste ein und aus.
 
@@ -35,6 +39,20 @@ Zip der neuesten Version laden und den Ordner `MoneyTalks` nach `Interface/AddOn
 entpacken, also neben den Ordner `Auctionator`.
 
 Danach das Spiel komplett neu starten. Ein `/reload` erkennt neue Addons nicht.
+
+## Zwischenprodukte
+
+Kannst du ein Material selbst billiger herstellen, als es im AH oder beim Händler
+kostet, rechnet MoneyTalks mit deinen Herstellkosten. Das geht über mehrere Stufen,
+zum Beispiel Leichtes Leder → Mittleres Leder → Schweres Leder.
+
+Dafür merkt sich das Addon pro Charakter die Rezepte jedes Berufs, den du einmal
+geöffnet hast. So erkennt es zum Beispiel Barren aus dem Bergbau als selbst
+herstellbar, während du die Schmiedekunst offen hast. Öffne nach der Installation
+jeden deiner Berufe einmal.
+
+`/moneytalks reset` löscht die gemerkten Rezepte. Das brauchst du, wenn du einen Beruf
+verlernt hast.
 
 ## Woher die Preise kommen
 
@@ -53,7 +71,10 @@ Danach das Spiel komplett neu starten. Ein `/reload` erkennt neue Addons nicht.
   liegt und ob sich das Endprodukt verkauft, weiß das Addon nicht.
 - Die Einstellgebühr im AH ist nicht eingerechnet. Sie geht verloren, wenn ein Item
   nicht verkauft wird.
-- Zwischenprodukte werden zum AH-Preis gerechnet, nicht zu den eigenen Herstellkosten.
+- Selbst herstellen zählt nur mit den Materialkosten. Der Zeitaufwand ist nicht
+  eingerechnet.
+- Zwischenprodukte erkennt das Addon nur aus Berufen dieses Charakters, nicht von
+  Zweitcharakteren.
 - Verzauberungen haben kein Endprodukt und zeigen nur Kosten.
 - Die Texte sind nur auf Deutsch.
 
