@@ -37,3 +37,11 @@ sortiert nach Gewinn.
   liegt und ob sich das Endprodukt verkauft, weiß das Addon nicht.
 - Zwischenprodukte werden zum AH-Preis gerechnet, nicht zu den eigenen Herstellkosten.
 - Verzauberungen haben kein Endprodukt und zeigen nur Kosten.
+
+## Neue Version veröffentlichen
+
+1. In `MoneyTalks/MoneyTalks.toc` die Zeile `## Version:` hochzählen und nach `main` bringen.
+2. Auf GitHub unter Actions den Workflow „Release" mit „Run workflow" starten.
+
+Der Workflow baut `MoneyTalks-v<Version>-forever.zip` und legt damit ein GitHub-Release
+an. WowUp findet Forever-Addons auf GitHub nur über die Endung `-forever.zip`.
