@@ -104,11 +104,11 @@ for _, o in ipairs(created) do
   if o.scripts.OnEnter and rawget(o, "shown") then rows[#rows + 1] = o end -- nur Rezeptzeilen haben einen Tooltip
 end
 
--- Kosten je Rezept: 4x100 + 2x50 = 500. 101: AH 1900 -> +1400, AH-Preis alt -> "~".
+-- Kosten je Rezept: 4x100 + 2x50 = 500. 101: AH 1900 -> +1400, AH-Preis alt -> "*".
 -- 102: Haendler 400 -> -100. 103: kein Erloes.
 assert(#rows == 3, "erwartet 3 gelernte Rezepte, gefunden " .. #rows)
 assert(rows[1].data.recipeID == 101 and rows[1].profit.text == "1400c" and rows[1].where.text == "AH")
-assert(rows[1].mark.text == "~" and rows[2].mark.text == "" and rows[3].mark.text == "")
+assert(rows[1].mark.text == "*" and rows[2].mark.text == "" and rows[3].mark.text == "")
 assert(rows[2].data.recipeID == 102 and rows[2].profit.text == "-100c" and rows[2].where.text == "Händler")
 assert(rows[3].data.recipeID == 103 and rows[3].profit.text == "?" and rows[3].where.text == "")
 assert(texts["Gewinn bei 1 von 3 Rezepten"], "Statuszeile fehlt")

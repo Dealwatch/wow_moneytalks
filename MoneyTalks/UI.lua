@@ -109,8 +109,8 @@ local function Column(row, font, width, justify, leftOf, gap)
   return fs
 end
 
--- Spalten: Symbol + Rezept | Kosten | Erloes | Verkauf (AH/Haendler) | Gewinn | "~"
--- Das "~" hat eine eigene schmale Spalte, damit die Betraege buendig bleiben.
+-- Spalten: Symbol + Rezept | Kosten | Erloes | Verkauf (AH/Haendler) | Gewinn | "*"
+-- Das "*" hat eine eigene schmale Spalte, damit die Betraege buendig bleiben.
 local function CreateRow(parent, frameType, font)
   local row = CreateFrame(frameType, nil, parent)
   row:SetSize(LIST_WIDTH, ROW_HEIGHT)
@@ -223,8 +223,8 @@ local function Refresh()
     row.value:SetText(Money(result.value))
     row.where:SetText(result.value and (result.sellToVendor and L.WHERE_VENDOR or L.WHERE_AH) or "")
     row.profit:SetText(ProfitText(result.profit))
-    -- "~" = der Gewinn beruht auf einem alten AH-Preis
-    row.mark:SetText(result.profit and result.stale and "~" or "")
+    -- "*" = der Gewinn beruht auf einem alten AH-Preis ("~" ist in der WoW-Schrift kaum lesbar)
+    row.mark:SetText(result.profit and result.stale and "*" or "")
     row:Show()
     if result.profit and result.profit > 0 then profitable = profitable + 1 end
     anyAHPrice = anyAHPrice or result.ahValue ~= nil

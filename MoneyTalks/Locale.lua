@@ -34,7 +34,7 @@ local de = {
   STATUS_NO_RECIPES = "Keine gelernten Rezepte gefunden.",
   STATUS_NO_PRICES = "Keine AH-Preise: bitte im Auktionshaus scannen.",
   STATUS_PROFIT = "Gewinn bei %d von %d Rezepten",
-  LEGEND = "? = Preis fehlt    ~ = Preis alt",
+  LEGEND = "? = Preis fehlt    * = Preis alt",
   LOCK = "Fixieren",
   RESET_DONE = "MoneyTalks: Gemerkte Rezepte gelöscht. Öffne deine Berufe, um sie neu einzulesen.",
 }
@@ -71,7 +71,7 @@ local en = {
   STATUS_NO_RECIPES = "No learned recipes found.",
   STATUS_NO_PRICES = "No AH prices yet: scan at the auction house.",
   STATUS_PROFIT = "Profit on %d of %d recipes",
-  LEGEND = "? = price missing    ~ = old price",
+  LEGEND = "? = price missing    * = old price",
   LOCK = "Lock",
   RESET_DONE = "MoneyTalks: Remembered recipes cleared. Open your professions to read them again.",
 }

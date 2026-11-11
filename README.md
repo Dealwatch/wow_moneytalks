@@ -56,7 +56,7 @@ The list is sorted by profit, the best recipe is at the top.
 | Profit | Revenue minus cost. Green is a profit, red is a loss. |
 
 - `?` means a price is missing. These recipes are greyed out at the end of the list.
-- `~` after the profit means one of the auction house prices used is older than 3 days,
+- `*` after the profit means one of the auction house prices used is older than 3 days,
   so the profit is less reliable.
 - A coloured recipe name means the recipe can give a skill-up, with the same colours as
   the profession window: orange is guaranteed, yellow is likely, green is unlikely. A
