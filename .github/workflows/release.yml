@@ -10,9 +10,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Tests
+        # Lua 5.1 (die Version von WoW) kommt aus dem Python-Paket lupa, nicht per apt:
+        # der Ubuntu-Paketserver war vom Runner aus schon nicht erreichbar.
         run: |
-          sudo apt-get install -y -q lua5.1
-          for t in tests/*_test.lua; do lua5.1 "$t"; done
+          pip install -q lupa
+          python3 -c "import glob, lupa.lua51 as lua; [lua.LuaRuntime().execute('dofile(\"%s\")' % t) for t in sorted(glob.glob('tests/*_test.lua'))]"
       - name: Zip bauen und Release anlegen
         env:
           GH_TOKEN: ${{ github.token }}
