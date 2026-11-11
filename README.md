@@ -1,8 +1,8 @@
 # wow_moneytalks
 
 MoneyTalks ist ein Addon für WoW Forever. Es zeigt neben dem Berufsfenster für alle
-gelernten Rezepte die Materialkosten, den AH-Wert des Endprodukts und den Gewinn,
-sortiert nach Gewinn.
+gelernten Rezepte die Materialkosten, den Verkaufswert des Endprodukts (AH oder Händler,
+je nachdem was mehr bringt) und den Gewinn, sortiert nach Gewinn.
 
 ## Installation
 
@@ -20,7 +20,10 @@ sortiert nach Gewinn.
 - **Händlerpreise** kennt Auctionator erst, nachdem du den Händler einmal besucht hast.
   Ist der Händler billiger als das AH, zählt der Händlerpreis.
 - **Rezepte** liest das Addon über `C_TradeSkillUI` aus dem offenen Berufsfenster.
-- **Gewinn** = AH-Wert × 0,95 (5 % AH-Gebühr) − Materialkosten.
+- **Verkauf** ist der bessere von zwei Wegen: AH-Preis × 0,95 (5 % AH-Gebühr) oder der
+  Preis, den ein Händler für das Item zahlt. Ein `H` vor dem Betrag heißt: Händler bringt
+  mehr. Ohne AH-Preis zählt der Händlerpreis als sichere Untergrenze.
+- **Gewinn** = Verkauf − Materialkosten.
 - `?` heißt: kein Preis bekannt. `+` hinter den Kosten heißt: mindestens ein Material
   hat keinen Preis, die Kosten sind also zu niedrig.
 - Mit der Maus über eine Zeile fahren zeigt die Kosten pro Material.

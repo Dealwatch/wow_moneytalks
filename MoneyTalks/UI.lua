@@ -12,6 +12,14 @@ local function VendorPrice(itemID)
   return Auctionator.API.v1.GetVendorPriceByItemID(ADDON, itemID)
 end
 
+-- Was ein Haendler fuer das Item zahlt. nil, solange das Spiel die Itemdaten noch laedt.
+local awaitingItemInfo = {}
+local function VendorSellPrice(itemID)
+  local price = select(11, C_Item.GetItemInfo(itemID))
+  if not price then awaitingItemInfo[itemID] = true end
+  return price
+end
+
 local function Money(copper)
   if not copper then return GRAY_FONT_COLOR:WrapTextInColorCode("?") end
   copper = math.floor(copper)
@@ -45,7 +53,7 @@ local function ReadRecipes()
       rows[#rows + 1] = {
         name = info.name,
         recipe = recipe,
-        result = ns.Evaluate(recipe, AHPrice, VendorPrice),
+        result = ns.Evaluate(recipe, AHPrice, VendorPrice, VendorSellPrice),
       }
     end
   end
@@ -91,8 +99,11 @@ local function ShowTooltip(row)
       Money(r.unit and r.unit * r.qty), 1, 1, 1, 1, 1, 1)
   end
   GameTooltip:AddDoubleLine("Materialkosten", Money(data.result.cost))
-  GameTooltip:AddDoubleLine("AH-Wert (nach 5 % Gebühr)", Money(data.result.value))
-  GameTooltip:AddDoubleLine("Gewinn", Money(data.result.profit))
+  GameTooltip:AddDoubleLine("AH-Wert (nach 5 % Gebühr)", Money(data.result.ahValue))
+  GameTooltip:AddDoubleLine("Händler-Verkauf", Money(data.result.vendorValue))
+  GameTooltip:AddDoubleLine(
+    data.result.sellToVendor and "Gewinn (beim Händler)" or "Gewinn (im AH)",
+    Money(data.result.profit))
   GameTooltip:Show()
 end
 
@@ -112,7 +123,8 @@ local function Refresh()
     row.name:SetText(data.name)
     -- "+" = mindestens ein Material ohne Preis, die Kosten sind also zu niedrig
     row.cost:SetText(Money(data.result.cost) .. (data.result.costIncomplete and "+" or ""))
-    row.value:SetText(Money(data.result.value))
+    -- "H" = an den Haendler verkaufen bringt mehr als das AH
+    row.value:SetText((data.result.sellToVendor and "H " or "") .. Money(data.result.value))
     row.profit:SetText(Money(data.result.profit))
     row:Show()
   end
@@ -149,7 +161,7 @@ local function CreateMainFrame()
   header:SetPoint("TOPLEFT", 14, -30)
   header.name:SetText("Rezept")
   header.cost:SetText("Mats")
-  header.value:SetText("AH-Wert")
+  header.value:SetText("Verkauf")
   header.profit:SetText("Gewinn")
 
   local scroll = CreateFrame("ScrollFrame", nil, frame, "UIPanelScrollFrameTemplate")
@@ -173,8 +185,15 @@ local events = CreateFrame("Frame")
 events:RegisterEvent("TRADE_SKILL_SHOW")
 events:RegisterEvent("TRADE_SKILL_LIST_UPDATE")
 events:RegisterEvent("TRADE_SKILL_CLOSE")
-events:SetScript("OnEvent", function(_, event)
-  if event == "TRADE_SKILL_SHOW" then
+events:RegisterEvent("GET_ITEM_INFO_RECEIVED") -- Haendlerpreise kommen evtl. erst nachtraeglich
+events:SetScript("OnEvent", function(_, event, itemID)
+  if event == "GET_ITEM_INFO_RECEIVED" then
+    -- feuert fuer jedes Item im Spiel; nur reagieren, wenn wir darauf warten
+    if awaitingItemInfo[itemID] then
+      awaitingItemInfo[itemID] = nil
+      QueueRefresh()
+    end
+  elseif event == "TRADE_SKILL_SHOW" then
     Open()
   elseif event == "TRADE_SKILL_CLOSE" then
     if frame then frame:Hide() end

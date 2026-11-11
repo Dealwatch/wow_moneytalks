@@ -4,8 +4,9 @@ local _, ns = ...
 ns.AH_CUT = 0.95 -- das AH behaelt 5 % vom Verkaufspreis
 
 -- recipe = { outputItemID, outputQty, reagents = { { itemID, qty }, ... } }
--- ahPrice / vendorPrice: function(itemID) -> Kupfer pro Stueck oder nil
-function ns.Evaluate(recipe, ahPrice, vendorPrice)
+-- ahPrice / vendorPrice / vendorSellPrice: function(itemID) -> Kupfer pro Stueck oder nil
+-- vendorPrice = was der Haendler verlangt, vendorSellPrice = was er fuer das Item zahlt
+function ns.Evaluate(recipe, ahPrice, vendorPrice, vendorSellPrice)
   local cost, costIncomplete, reagents = 0, false, {}
   for _, r in ipairs(recipe.reagents) do
     local ah, vendor = ahPrice(r.itemID), vendorPrice(r.itemID)
@@ -22,11 +23,20 @@ function ns.Evaluate(recipe, ahPrice, vendorPrice)
   end
 
   local sale = recipe.outputItemID and ahPrice(recipe.outputItemID)
-  local value = sale and math.floor(sale * recipe.outputQty * ns.AH_CUT)
+  local ahValue = sale and math.floor(sale * recipe.outputQty * ns.AH_CUT)
+  local sell = recipe.outputItemID and vendorSellPrice(recipe.outputItemID)
+  -- 0 = der Haendler kauft das Item nicht
+  local vendorValue = sell and sell > 0 and math.floor(sell * recipe.outputQty) or nil
+  -- bei Gleichstand Haendler: sofort, sicher und ohne Einstellgebuehr
+  local sellToVendor = vendorValue ~= nil and (ahValue == nil or vendorValue >= ahValue)
+  local value = sellToVendor and vendorValue or ahValue
   return {
     cost = cost,
     costIncomplete = costIncomplete,
-    value = value,
+    ahValue = ahValue,
+    vendorValue = vendorValue,
+    value = value, -- der bessere der beiden Verkaufswege
+    sellToVendor = sellToVendor,
     -- kein Gewinn, wenn ein Preis fehlt: lieber "?" als eine falsche Zahl
     profit = value and not costIncomplete and math.floor(value - cost) or nil,
     reagents = reagents,
