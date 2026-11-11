@@ -1,6 +1,6 @@
 local ADDON, ns = ...
 
-local ROW_HEIGHT, NAME_WIDTH, MONEY_WIDTH = 16, 190, 85
+local ROW_HEIGHT, NAME_WIDTH, MONEY_WIDTH = 16, 190, 100
 local WIDTH = NAME_WIDTH + 3 * MONEY_WIDTH + 50
 
 local function AHPrice(itemID)
@@ -122,6 +122,18 @@ local function Refresh()
   content:SetHeight(math.max(#rows * ROW_HEIGHT, 1))
 end
 
+-- Das Spiel meldet Listen-Aenderungen oft mehrfach hintereinander (z. B. bei jedem
+-- hergestellten Item); deshalb gesammelt und hoechstens alle 0,2 s neu rechnen.
+local refreshQueued = false
+local function QueueRefresh()
+  if refreshQueued then return end
+  refreshQueued = true
+  C_Timer.After(0.2, function()
+    refreshQueued = false
+    if frame and frame:IsShown() then Refresh() end
+  end)
+end
+
 local function CreateMainFrame()
   frame = CreateFrame("Frame", "MoneyTalksFrame", UIParent, "BasicFrameTemplateWithInset")
   frame:SetSize(WIDTH, 420)
@@ -130,6 +142,7 @@ local function CreateMainFrame()
   else
     frame:SetPoint("CENTER")
   end
+  frame:SetClampedToScreen(true)
   if frame.TitleText then frame.TitleText:SetText("MoneyTalks") end
 
   local header = CreateRow(frame)
@@ -147,9 +160,7 @@ local function CreateMainFrame()
   scroll:SetScrollChild(content)
 
   -- neu rechnen, sobald Auctionator nach einem Scan neue Preise hat
-  Auctionator.API.v1.RegisterForDBUpdate(ADDON, function()
-    if frame:IsShown() then Refresh() end
-  end)
+  Auctionator.API.v1.RegisterForDBUpdate(ADDON, QueueRefresh)
 end
 
 local function Open()
@@ -167,12 +178,13 @@ events:SetScript("OnEvent", function(_, event)
     Open()
   elseif event == "TRADE_SKILL_CLOSE" then
     if frame then frame:Hide() end
-  elseif frame and frame:IsShown() then
-    Refresh()
+  else
+    QueueRefresh()
   end
 end)
 
-SLASH_MONEYTALKS1, SLASH_MONEYTALKS2 = "/mt", "/moneytalks"
+-- "/mt" ist von Blizzard belegt (Main Tank)
+SLASH_MONEYTALKS1, SLASH_MONEYTALKS2 = "/moneytalks", "/mtalk"
 SlashCmdList.MONEYTALKS = function()
   if frame and frame:IsShown() then frame:Hide() else Open() end
 end

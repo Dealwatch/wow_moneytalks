@@ -10,7 +10,8 @@ sortiert nach Gewinn.
 2. Den Ordner `MoneyTalks` nach `World of Warcraft/_forever_/Interface/AddOns/` kopieren.
    Der Ordnername unter `World of Warcraft` kann abweichen; es ist der, in dem auch
    `Auctionator` liegt.
-3. Im Spiel `/reload`, dann ein Berufsfenster öffnen. `/mt` blendet die Liste ein und aus.
+3. Das Spiel komplett neu starten (ein `/reload` erkennt neue Addons nicht), dann ein
+   Berufsfenster öffnen. `/moneytalks` (kurz `/mtalk`) blendet die Liste ein und aus.
 
 ## Wie es funktioniert
 
