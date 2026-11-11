@@ -45,6 +45,14 @@ local function ProfitText(profit)
   return Money(profit, profit and (profit > 0 and GREEN_FONT_COLOR or profit < 0 and RED_FONT_COLOR))
 end
 
+-- Skillpunkt-Chance mit den Farben des Berufsfensters. Rezepte ohne Skillpunkt fehlen hier.
+local Difficulty = Enum.TradeskillRelativeDifficulty
+local SKILL = {
+  [Difficulty.Optimal] = { text = L.SKILL_OPTIMAL, r = 1, g = 0.5, b = 0.25 },
+  [Difficulty.Medium] = { text = L.SKILL_MEDIUM, r = 1, g = 1, b = 0 },
+  [Difficulty.Easy] = { text = L.SKILL_EASY, r = 0.25, g = 0.75, b = 0.25 },
+}
+
 -- Liest alle gelernten Rezepte des gerade offenen Berufs und merkt sie sich pro Charakter
 -- (MoneyTalksRecipes), damit Zwischenprodukte aus anderen Berufen erkannt werden.
 local function ReadRecipes()
@@ -71,7 +79,10 @@ local function ReadRecipes()
         outputQty = (schematic.quantityMin + schematic.quantityMax) / 2,
         reagents = reagents,
       }
-      rows[#rows + 1] = { recipeID = recipeID, name = info.name, icon = info.icon, recipe = recipe }
+      rows[#rows + 1] = {
+        recipeID = recipeID, name = info.name, icon = info.icon, recipe = recipe,
+        skill = info.canSkillUp ~= false and SKILL[info.relativeDifficulty] or nil,
+      }
       if own then MoneyTalksRecipes[recipeID] = recipe end
     elseif own then
       MoneyTalksRecipes[recipeID] = nil -- nicht (mehr) gelernt
@@ -119,15 +130,15 @@ local function AgeText(age)
   return age and L.AGE_DAYS:format(age) or L.AGE_UNKNOWN
 end
 
--- Grauer Zusatz hinter einem Material: woher es am billigsten kommt, ob der Preis alt ist
+-- Grauer Zusatz hinter jedem Material: woher der billigste Preis kommt, ob er alt ist
 local function ReagentNote(r)
   local note
   if r.source == "vendor" then
     note = L.NOTE_VENDOR
   elseif r.source == "craft" then
     note = r.old and L.NOTE_CRAFT_OLD or L.NOTE_CRAFT
-  elseif r.old then
-    note = AgeText(r.age)
+  elseif r.source == "ah" then
+    note = L.NOTE_AH .. (r.old and ", " .. AgeText(r.age) or "")
   end
   return note and GRAY_FONT_COLOR:WrapTextInColorCode(" " .. note) or ""
 end
@@ -145,6 +156,13 @@ local function ShowTooltip(row)
   local result = row.data.result
   GameTooltip:SetOwner(row, "ANCHOR_RIGHT")
   GameTooltip:AddLine(row.data.name)
+  local skill = row.data.skill
+  if skill then
+    GameTooltip:AddLine(L.SKILL:format(skill.text), skill.r, skill.g, skill.b)
+  else
+    GameTooltip:AddLine(L.SKILL:format(L.SKILL_NONE), 0.5, 0.5, 0.5)
+  end
+  GameTooltip:AddLine(" ")
   for _, r in ipairs(result.reagents) do
     local name = C_Item.GetItemNameByID(r.itemID) or ("item:" .. r.itemID)
     GameTooltip:AddDoubleLine(
@@ -193,9 +211,14 @@ local function Refresh()
     row.data = data
     row.icon:SetTexture(data.icon)
     row.name:SetText(data.name)
-    -- Rezepte ohne berechenbaren Gewinn treten optisch zurueck
-    local shade = result.profit and 1 or 0.5
-    row.name:SetTextColor(shade, shade, shade)
+    if data.skill then
+      -- farbiger Name = gibt (vielleicht) einen Skillpunkt, wie im Berufsfenster
+      row.name:SetTextColor(data.skill.r, data.skill.g, data.skill.b)
+    else
+      -- Rezepte ohne berechenbaren Gewinn treten optisch zurueck
+      local shade = result.profit and 1 or 0.5
+      row.name:SetTextColor(shade, shade, shade)
+    end
     row.cost:SetText(Money(not result.costIncomplete and result.cost))
     row.value:SetText(Money(result.value))
     row.where:SetText(result.value and (result.sellToVendor and L.WHERE_VENDOR or L.WHERE_AH) or "")
@@ -235,12 +258,35 @@ end
 local function CreateMainFrame()
   frame = CreateFrame("Frame", "MoneyTalksFrame", UIParent, "BasicFrameTemplateWithInset")
   frame:SetSize(WIDTH, 420)
-  if ProfessionsFrame then
-    frame:SetPoint("TOPLEFT", ProfessionsFrame, "TOPRIGHT", 4, 0)
+  MoneyTalksDB = MoneyTalksDB or {}
+  local pos = MoneyTalksDB.pos
+  if pos then
+    frame:SetPoint(pos[1], UIParent, pos[2], pos[3], pos[4])
+  elseif ProfessionsFrame then
+    -- 56: Platz fuer die Berufs-Reiter, die rechts aus dem Berufsfenster ragen
+    frame:SetPoint("TOPLEFT", ProfessionsFrame, "TOPRIGHT", 56, 0)
   else
     frame:SetPoint("CENTER")
   end
   frame:SetClampedToScreen(true)
+
+  -- Mit der Maus verschiebbar (an Titelleiste oder Rand), solange nicht fixiert
+  frame:SetMovable(true)
+  frame:EnableMouse(true)
+  frame:RegisterForDrag("LeftButton")
+  frame:SetScript("OnDragStart", function(self)
+    if not MoneyTalksDB.locked then
+      self.moving = true
+      self:StartMoving()
+    end
+  end)
+  frame:SetScript("OnDragStop", function(self)
+    if not self.moving then return end
+    self.moving = nil
+    self:StopMovingOrSizing()
+    local point, _, relPoint, x, y = self:GetPoint()
+    MoneyTalksDB.pos = { point, relPoint, x, y }
+  end)
   if frame.TitleText then frame.TitleText:SetText("MoneyTalks") end
 
   local header = CreateRow(frame, "Frame", "GameFontNormalSmall")
@@ -258,8 +304,16 @@ local function CreateMainFrame()
   content:SetSize(LIST_WIDTH, 1)
   scroll:SetScrollChild(content)
 
+  local lock = CreateFrame("CheckButton", nil, frame, "UICheckButtonTemplate")
+  lock:SetSize(22, 22)
+  lock:SetPoint("BOTTOMLEFT", 10, 5)
+  lock.Text:SetFontObject("GameFontDisableSmall")
+  lock.Text:SetText(L.LOCK)
+  lock:SetChecked(MoneyTalksDB.locked == true)
+  lock:SetScript("OnClick", function(self) MoneyTalksDB.locked = self:GetChecked() end)
+
   status = frame:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-  status:SetPoint("BOTTOMLEFT", 16, 11)
+  status:SetPoint("LEFT", lock.Text, "RIGHT", 12, 0)
   local legend = frame:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
   legend:SetPoint("BOTTOMRIGHT", -16, 11)
   legend:SetText(L.LEGEND)

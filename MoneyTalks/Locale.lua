@@ -11,11 +11,18 @@ local de = {
   WHERE_AH = "AH",
   WHERE_VENDOR = "Händler",
 
+  NOTE_AH = "AH",
   NOTE_VENDOR = "Händler",
   NOTE_CRAFT = "selbst herstellen",
   NOTE_CRAFT_OLD = "selbst herstellen, Preis alt",
   AGE_DAYS = "%d Tage alt",
   AGE_UNKNOWN = "Alter unbekannt",
+
+  SKILL = "Skillpunkt: %s",
+  SKILL_OPTIMAL = "sicher",
+  SKILL_MEDIUM = "wahrscheinlich",
+  SKILL_EASY = "selten",
+  SKILL_NONE = "keiner",
 
   TIP_COST = "Kosten",
   TIP_REVENUE_AH = "Erlös im AH",
@@ -28,6 +35,7 @@ local de = {
   STATUS_NO_PRICES = "Keine AH-Preise: bitte im Auktionshaus scannen.",
   STATUS_PROFIT = "Gewinn bei %d von %d Rezepten",
   LEGEND = "? = Preis fehlt    ~ = Preis alt",
+  LOCK = "Fixieren",
   RESET_DONE = "MoneyTalks: Gemerkte Rezepte gelöscht. Öffne deine Berufe, um sie neu einzulesen.",
 }
 
@@ -40,11 +48,18 @@ local en = {
   WHERE_AH = "AH",
   WHERE_VENDOR = "Vendor",
 
+  NOTE_AH = "AH",
   NOTE_VENDOR = "vendor",
   NOTE_CRAFT = "craft yourself",
   NOTE_CRAFT_OLD = "craft yourself, old price",
   AGE_DAYS = "%d days old",
   AGE_UNKNOWN = "age unknown",
+
+  SKILL = "Skill-up: %s",
+  SKILL_OPTIMAL = "guaranteed",
+  SKILL_MEDIUM = "likely",
+  SKILL_EASY = "unlikely",
+  SKILL_NONE = "none",
 
   TIP_COST = "Cost",
   TIP_REVENUE_AH = "AH revenue",
@@ -57,6 +72,7 @@ local en = {
   STATUS_NO_PRICES = "No AH prices yet: scan at the auction house.",
   STATUS_PROFIT = "Profit on %d of %d recipes",
   LEGEND = "? = price missing    ~ = old price",
+  LOCK = "Lock",
   RESET_DONE = "MoneyTalks: Remembered recipes cleared. Open your professions to read them again.",
 }
 
