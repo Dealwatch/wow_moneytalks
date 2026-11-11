@@ -28,6 +28,7 @@ Die Liste ist nach Gewinn sortiert, der beste Tipp steht oben.
   Verkaufswege ist ausgegraut.
 - Ein Klick auf eine Zeile zeigt das Rezept im Berufsfenster.
 - `/moneytalks` (kurz `/mtalk`) blendet die Liste ein und aus.
+- Im deutschen Client sind die Texte deutsch, in allen anderen Sprachen englisch.
 
 ## Installation
 
@@ -78,11 +79,11 @@ verlernt hast.
 - Zwischenprodukte erkennt das Addon nur aus Berufen dieses Charakters, nicht von
   Zweitcharakteren.
 - Verzauberungen haben kein Endprodukt und zeigen nur Kosten.
-- Die Texte sind nur auf Deutsch.
 
 ## Für Entwickler
 
 - `MoneyTalks/Core.lua`: Rechenlogik ohne WoW-API.
+- `MoneyTalks/Locale.lua`: deutsche und englische Texte.
 - `MoneyTalks/UI.lua`: Fenster, Rezepte auslesen, Anbindung an Auctionator.
 - `tests/core_test.lua`: prüft die Rechenlogik.
 - `tests/ui_smoke_test.lua`: lädt die Oberfläche mit nachgebauter WoW-API und fängt

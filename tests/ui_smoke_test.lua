@@ -60,8 +60,23 @@ C_TradeSkillUI = {
   IsTradeSkillGuild = function() return false end,
 }
 
+-- Deutsche und englische Texte muessen dieselben Schluessel haben
+local function locale(code)
+  GetLocale = function() return code end
+  local t = {}
+  assert(loadfile("MoneyTalks/Locale.lua"))("MoneyTalks", t)
+  return t.L
+end
+local de, en = locale("deDE"), locale("enUS")
+assert(de.HEADER_PROFIT == "Gewinn" and en.HEADER_PROFIT == "Profit")
+for key in pairs(de) do assert(en[key], "englischer Text fehlt: " .. key) end
+for key in pairs(en) do assert(de[key], "deutscher Text fehlt: " .. key) end
+
+-- der restliche Test laeuft mit deutschen Texten
+GetLocale = function() return "deDE" end
 local ns = {}
 assert(loadfile("MoneyTalks/Core.lua"))("MoneyTalks", ns)
+assert(loadfile("MoneyTalks/Locale.lua"))("MoneyTalks", ns)
 assert(loadfile("MoneyTalks/UI.lua"))("MoneyTalks", ns)
 
 local events = created[#created] -- der Ereignis-Frame ist das einzige Objekt, das UI.lua beim Laden anlegt
