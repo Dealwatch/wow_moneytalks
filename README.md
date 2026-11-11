@@ -15,6 +15,8 @@ the highlighted row.*
 - Prices each material by the cheapest route: auction house, vendor, or crafting it
   yourself, across several steps.
 - Flags profits that rely on old auction house prices.
+- Shows whether a recipe can still give a skill-up.
+- The window can be moved anywhere and locked in place.
 - German texts on a German client, English texts on every other client.
 
 ## Requirements
@@ -39,7 +41,8 @@ Restart the game completely afterwards. A `/reload` does not pick up new addons.
 1. Open the auction house once so Auctionator has prices. To keep them fresh, turn on
    the autoscan in the Auctionator options (`/atr config`, basic options).
 2. Open each of your professions once. MoneyTalks remembers their recipes.
-3. The list appears next to the profession window whenever you open a profession.
+3. The list appears next to the profession window whenever you open a profession. Drag
+   it by its title bar to where you want it.
 
 ## Reading the list
 
@@ -53,12 +56,22 @@ The list is sorted by profit, the best recipe is at the top.
 | Profit | Revenue minus cost. Green is a profit, red is a loss. |
 
 - `?` means a price is missing. These recipes are greyed out at the end of the list.
-- `~` after the profit means one of the auction house prices used is older than 3 days,
+- `*` after the profit means one of the auction house prices used is older than 3 days,
   so the profit is less reliable.
-- Hover a row to see the cost of each material and both sale routes. A grey note after
-  a material says where it is cheapest (`vendor`, `craft yourself`) and how old an old
-  price is. The worse of the two sale routes is greyed out.
+- A coloured recipe name means the recipe can give a skill-up, with the same colours as
+  the profession window: orange is guaranteed, yellow is likely, green is unlikely. A
+  white name gives no skill-up.
+- Hover a row to see the skill-up chance, the cost of each material and both sale
+  routes. A grey note after every material says where its cheapest price comes from
+  (`AH`, `vendor` or `craft yourself`) and how old an old price is. The worse of the two
+  sale routes is greyed out.
 - Click a row to show the recipe in the profession window.
+
+## Moving the window
+
+Drag the window by its title bar or its edge. Tick **Lock** at the bottom left to fix it
+in place, untick it to move it again. Position and lock are remembered for all your
+characters. Once moved, the window no longer follows the profession window.
 
 ## Commands
 

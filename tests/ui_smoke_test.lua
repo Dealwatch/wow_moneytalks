@@ -7,7 +7,12 @@ local function stub()
   local o = { scripts = {} }
   created[#created + 1] = o
   return setmetatable(o, { __index = function(_, key)
-    if key == "TitleText" or key == "data" then return nil end
+    if key == "TitleText" or key == "data" or key == "moving" then return nil end
+    if key == "Text" then local t = stub(); rawset(o, "Text", t); return t end
+    if key == "GetPoint" then return function() return "CENTER", nil, "CENTER", 10, 20 end end
+    if key == "SetChecked" then return function(self, v) self.checked = v end end
+    if key == "GetChecked" then return function(self) return self.checked end end
+    if key == "SetTextColor" then return function(self, r, g, b) self.color = { r, g, b } end end
     if key == "CreateFontString" or key == "CreateTexture" then return stub end
     if key == "SetScript" then return function(self, name, fn) self.scripts[name] = fn end end
     if key == "SetText" then return function(self, text) self.text = text end end
@@ -25,7 +30,10 @@ GameTooltip_Hide = function() end
 GetMoneyString = function(copper) return copper .. "c" end
 C_Timer = { After = function(_, fn) fn() end }
 SlashCmdList = {}
-Enum = { CraftingReagentType = { Basic = 1 } }
+Enum = {
+  CraftingReagentType = { Basic = 1 },
+  TradeskillRelativeDifficulty = { Optimal = 0, Medium = 1, Easy = 2, Trivial = 3 },
+}
 
 -- Item 1 = Leder (AH 100), 2 = Faden (Haendler 50), 10/11/12 = Endprodukte
 local ahPrices = { [1] = 100, [10] = 2000, [11] = 100 }
@@ -43,7 +51,13 @@ C_Item = {
 local opened
 C_TradeSkillUI = {
   GetAllRecipeIDs = function() return { 101, 102, 103, 104 } end,
-  GetRecipeInfo = function(id) return { name = "Rezept " .. id, icon = 1, learned = id ~= 104 } end,
+  GetRecipeInfo = function(id)
+    -- 101: orange (sicherer Skillpunkt), 102: grau (keiner), 103: gruen, aber canSkillUp = false
+    return {
+      name = "Rezept " .. id, icon = 1, learned = id ~= 104,
+      relativeDifficulty = ({ [101] = 0, [102] = 3, [103] = 2 })[id], canSkillUp = id ~= 103,
+    }
+  end,
   GetRecipeSchematic = function(id)
     return {
       outputItemID = ({ [101] = 10, [102] = 11, [103] = 12 })[id], quantityMin = 1, quantityMax = 1,
@@ -87,17 +101,37 @@ events.scripts.OnEvent(events, "GET_ITEM_INFO_RECEIVED", 10)
 local texts, rows = {}, {}
 for _, o in ipairs(created) do
   if o.text then texts[o.text] = true end
-  if o.scripts.OnClick and o.shown then rows[#rows + 1] = o end
+  if o.scripts.OnEnter and rawget(o, "shown") then rows[#rows + 1] = o end -- nur Rezeptzeilen haben einen Tooltip
 end
 
--- Kosten je Rezept: 4x100 + 2x50 = 500. 101: AH 1900 -> +1400, AH-Preis alt -> "~".
+-- Kosten je Rezept: 4x100 + 2x50 = 500. 101: AH 1900 -> +1400, AH-Preis alt -> "*".
 -- 102: Haendler 400 -> -100. 103: kein Erloes.
 assert(#rows == 3, "erwartet 3 gelernte Rezepte, gefunden " .. #rows)
 assert(rows[1].data.recipeID == 101 and rows[1].profit.text == "1400c" and rows[1].where.text == "AH")
-assert(rows[1].mark.text == "~" and rows[2].mark.text == "" and rows[3].mark.text == "")
+assert(rows[1].mark.text == "*" and rows[2].mark.text == "" and rows[3].mark.text == "")
 assert(rows[2].data.recipeID == 102 and rows[2].profit.text == "-100c" and rows[2].where.text == "Händler")
 assert(rows[3].data.recipeID == 103 and rows[3].profit.text == "?" and rows[3].where.text == "")
 assert(texts["Gewinn bei 1 von 3 Rezepten"], "Statuszeile fehlt")
+
+-- Namensfarbe: orange bei Skillpunkt, sonst weiss bzw. grau ohne berechenbaren Gewinn
+assert(rows[1].name.color[2] == 0.5 and rows[1].data.skill.text == "sicher")
+assert(rows[2].name.color[1] == 1 and rows[2].name.color[2] == 1 and rows[2].data.skill == nil)
+assert(rows[3].name.color[1] == 0.5 and rows[3].data.skill == nil)
+
+-- Fenster verschieben: frei merkt die Position, fixiert bewegt sich nicht
+local main, lock
+for _, o in ipairs(created) do
+  if o.scripts.OnDragStart then main = o end
+  if rawget(o, "Text") and o.scripts.OnClick then lock = o end
+end
+assert(main and lock and lock.Text.text == "Fixieren" and lock.checked == false)
+main.scripts.OnDragStart(main); main.scripts.OnDragStop(main)
+assert(MoneyTalksDB.pos[1] == "CENTER" and MoneyTalksDB.pos[3] == 10 and MoneyTalksDB.pos[4] == 20)
+MoneyTalksDB.pos = nil
+lock.checked = true; lock.scripts.OnClick(lock)
+assert(MoneyTalksDB.locked == true)
+main.scripts.OnDragStart(main); main.scripts.OnDragStop(main)
+assert(MoneyTalksDB.pos == nil, "fixiertes Fenster darf sich nicht verschieben")
 
 -- gelernte Rezepte werden gemerkt, das ungelernte (104) nicht
 assert(MoneyTalksRecipes[101] and MoneyTalksRecipes[102] and MoneyTalksRecipes[103] and not MoneyTalksRecipes[104])

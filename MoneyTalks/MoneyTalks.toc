@@ -2,8 +2,9 @@
 ## Title: MoneyTalks
 ## Notes: Shows material cost, sale value (AH or vendor) and profit for every learned recipe (prices from Auctionator).
 ## Notes-deDE: Zeigt für alle gelernten Rezepte Materialkosten, Verkaufswert (AH oder Händler) und Gewinn (Preise von Auctionator).
-## Version: 0.3.1
+## Version: 0.4.0
 ## Dependencies: Auctionator
+## SavedVariables: MoneyTalksDB
 ## SavedVariablesPerCharacter: MoneyTalksRecipes
 
 Core.lua
