@@ -1,4 +1,5 @@
 local ADDON, ns = ...
+local L = ns.L
 
 local ROW_HEIGHT, ICON_SIZE = 18, 14
 local NAME_WIDTH, MONEY_WIDTH, WHERE_WIDTH, PROFIT_WIDTH, MARK_WIDTH = 180, 88, 58, 84, 12
@@ -115,16 +116,16 @@ local function CreateRow(parent, frameType, font)
 end
 
 local function AgeText(age)
-  return age and ("%d Tage alt"):format(age) or "Alter unbekannt"
+  return age and L.AGE_DAYS:format(age) or L.AGE_UNKNOWN
 end
 
 -- Grauer Zusatz hinter einem Material: woher es am billigsten kommt, ob der Preis alt ist
 local function ReagentNote(r)
   local note
   if r.source == "vendor" then
-    note = "Händler"
+    note = L.NOTE_VENDOR
   elseif r.source == "craft" then
-    note = r.old and "selbst herstellen, Preis alt" or "selbst herstellen"
+    note = r.old and L.NOTE_CRAFT_OLD or L.NOTE_CRAFT
   elseif r.old then
     note = AgeText(r.age)
   end
@@ -150,15 +151,15 @@ local function ShowTooltip(row)
       r.qty .. "x " .. name .. ReagentNote(r), Money(r.unit and r.unit * r.qty), 1, 1, 1, 1, 1, 1)
   end
   GameTooltip:AddLine(" ")
-  SummaryLine("Kosten", Money(not result.costIncomplete and result.cost))
+  SummaryLine(L.TIP_COST, Money(not result.costIncomplete and result.cost))
   -- der schlechtere der beiden Verkaufswege wird ausgegraut
-  local ahNote = "abzgl. 5 %" .. (result.ahValueOld and ", " .. AgeText(result.ahValueAge) or "")
-  SummaryLine("Erlös im AH" .. GRAY_FONT_COLOR:WrapTextInColorCode(" " .. ahNote),
+  local ahNote = L.TIP_AH_FEE .. (result.ahValueOld and ", " .. AgeText(result.ahValueAge) or "")
+  SummaryLine(L.TIP_REVENUE_AH .. GRAY_FONT_COLOR:WrapTextInColorCode(" " .. ahNote),
     Money(result.ahValue), result.sellToVendor)
-  SummaryLine("Erlös beim Händler", Money(result.vendorValue), result.value and not result.sellToVendor)
-  SummaryLine("Gewinn", ProfitText(result.profit))
+  SummaryLine(L.TIP_REVENUE_VENDOR, Money(result.vendorValue), result.value and not result.sellToVendor)
+  SummaryLine(L.TIP_PROFIT, ProfitText(result.profit))
   GameTooltip:AddLine(" ")
-  GameTooltip:AddLine("Klick zeigt das Rezept", 0.5, 0.5, 0.5)
+  GameTooltip:AddLine(L.TIP_CLICK, 0.5, 0.5, 0.5)
   GameTooltip:Show()
 end
 
@@ -197,7 +198,7 @@ local function Refresh()
     row.name:SetTextColor(shade, shade, shade)
     row.cost:SetText(Money(not result.costIncomplete and result.cost))
     row.value:SetText(Money(result.value))
-    row.where:SetText(result.value and (result.sellToVendor and "Händler" or "AH") or "")
+    row.where:SetText(result.value and (result.sellToVendor and L.WHERE_VENDOR or L.WHERE_AH) or "")
     row.profit:SetText(ProfitText(result.profit))
     -- "~" = der Gewinn beruht auf einem alten AH-Preis
     row.mark:SetText(result.profit and result.stale and "~" or "")
@@ -211,11 +212,11 @@ local function Refresh()
   content:SetHeight(math.max(#rows * ROW_HEIGHT, 1))
 
   if #rows == 0 then
-    status:SetText("Keine gelernten Rezepte gefunden.")
+    status:SetText(L.STATUS_NO_RECIPES)
   elseif not anyAHPrice then
-    status:SetText("Keine AH-Preise: bitte im Auktionshaus scannen.")
+    status:SetText(L.STATUS_NO_PRICES)
   else
-    status:SetText(("Gewinn bei %d von %d Rezepten"):format(profitable, #rows))
+    status:SetText(L.STATUS_PROFIT:format(profitable, #rows))
   end
 end
 
@@ -244,11 +245,11 @@ local function CreateMainFrame()
 
   local header = CreateRow(frame, "Frame", "GameFontNormalSmall")
   header:SetPoint("TOPLEFT", 14, -30)
-  header.name:SetText("Rezept")
-  header.cost:SetText("Kosten")
-  header.value:SetText("Erlös")
-  header.where:SetText("Verkauf")
-  header.profit:SetText("Gewinn")
+  header.name:SetText(L.HEADER_RECIPE)
+  header.cost:SetText(L.HEADER_COST)
+  header.value:SetText(L.HEADER_REVENUE)
+  header.where:SetText(L.HEADER_WHERE)
+  header.profit:SetText(L.HEADER_PROFIT)
 
   local scroll = CreateFrame("ScrollFrame", nil, frame, "UIPanelScrollFrameTemplate")
   scroll:SetPoint("TOPLEFT", 14, -50)
@@ -261,7 +262,7 @@ local function CreateMainFrame()
   status:SetPoint("BOTTOMLEFT", 16, 11)
   local legend = frame:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
   legend:SetPoint("BOTTOMRIGHT", -16, 11)
-  legend:SetText("? = Preis fehlt    ~ = Preis alt")
+  legend:SetText(L.LEGEND)
 
   -- neu rechnen, sobald Auctionator nach einem Scan neue Preise hat
   Auctionator.API.v1.RegisterForDBUpdate(ADDON, QueueRefresh)
@@ -300,7 +301,7 @@ SlashCmdList.MONEYTALKS = function(msg)
   if msg == "reset" then
     -- z. B. nach dem Verlernen eines Berufs, dessen Rezepte sonst gemerkt bleiben
     MoneyTalksRecipes = {}
-    print("MoneyTalks: Gemerkte Rezepte gelöscht. Öffne deine Berufe, um sie neu einzulesen.")
+    print(L.RESET_DONE)
   elseif frame and frame:IsShown() then
     frame:Hide()
   else
