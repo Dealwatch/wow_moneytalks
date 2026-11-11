@@ -1,7 +1,9 @@
 local ADDON, ns = ...
 
-local ROW_HEIGHT, NAME_WIDTH, MONEY_WIDTH = 16, 190, 100
-local WIDTH = NAME_WIDTH + 3 * MONEY_WIDTH + 50
+local ROW_HEIGHT, ICON_SIZE = 18, 14
+local NAME_WIDTH, MONEY_WIDTH, WHERE_WIDTH = 180, 88, 66
+local LIST_WIDTH = NAME_WIDTH + 3 * MONEY_WIDTH + WHERE_WIDTH
+local WIDTH = LIST_WIDTH + 50
 
 local function AHPrice(itemID)
   return Auctionator.API.v1.GetAuctionPriceByItemID(ADDON, itemID)
@@ -20,13 +22,17 @@ local function VendorSellPrice(itemID)
   return price
 end
 
-local function Money(copper)
+-- copper = nil/false ergibt ein graues "?": das einzige Zeichen fuer "Preis fehlt"
+local function Money(copper, color)
   if not copper then return GRAY_FONT_COLOR:WrapTextInColorCode("?") end
-  copper = math.floor(copper)
-  if copper < 0 then
-    return RED_FONT_COLOR:WrapTextInColorCode("-" .. GetMoneyString(-copper, true))
-  end
-  return GetMoneyString(copper, true)
+  local abs = math.abs(math.floor(copper))
+  if abs >= 10000 then abs = abs - abs % 100 end -- ab 1 Gold ohne Kupfer: ruhigeres Bild
+  local text = (copper < 0 and "-" or "") .. GetMoneyString(abs, true)
+  return color and color:WrapTextInColorCode(text) or text
+end
+
+local function ProfitText(profit)
+  return Money(profit, profit and (profit > 0 and GREEN_FONT_COLOR or profit < 0 and RED_FONT_COLOR))
 end
 
 -- Liest alle gelernten Rezepte des gerade offenen Berufs.
@@ -51,8 +57,9 @@ local function ReadRecipes()
         reagents = reagents,
       }
       rows[#rows + 1] = {
+        recipeID = recipeID,
         name = info.name,
-        recipe = recipe,
+        icon = info.icon,
         result = ns.Evaluate(recipe, AHPrice, VendorPrice, VendorSellPrice),
       }
     end
@@ -61,77 +68,104 @@ local function ReadRecipes()
   return rows
 end
 
-local frame, content
+local frame, content, status
 local rowFrames = {}
 
-local function Column(parent, width, justify, anchorTo)
-  local fs = parent:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+local function Column(row, font, width, justify, leftOf, gap)
+  local fs = row:CreateFontString(nil, "OVERLAY", font)
   fs:SetWidth(width)
   fs:SetJustifyH(justify)
   fs:SetWordWrap(false)
-  if anchorTo then
-    fs:SetPoint("LEFT", anchorTo, "RIGHT")
-  else
-    fs:SetPoint("LEFT")
-  end
+  fs:SetPoint("LEFT", leftOf, "RIGHT", gap or 0, 0)
   return fs
 end
 
-local function CreateRow(parent)
-  local row = CreateFrame("Frame", nil, parent)
-  row:SetSize(WIDTH - 50, ROW_HEIGHT)
-  row.name = Column(row, NAME_WIDTH, "LEFT")
-  row.cost = Column(row, MONEY_WIDTH, "RIGHT", row.name)
-  row.value = Column(row, MONEY_WIDTH, "RIGHT", row.cost)
-  row.profit = Column(row, MONEY_WIDTH, "RIGHT", row.value)
+-- Spalten: Symbol + Rezept | Kosten | Erloes | Verkauf (AH/Haendler) | Gewinn
+local function CreateRow(parent, frameType, font)
+  local row = CreateFrame(frameType, nil, parent)
+  row:SetSize(LIST_WIDTH, ROW_HEIGHT)
+  row.icon = row:CreateTexture(nil, "ARTWORK")
+  row.icon:SetSize(ICON_SIZE, ICON_SIZE)
+  row.icon:SetPoint("LEFT")
+  row.name = Column(row, font, NAME_WIDTH - ICON_SIZE - 5, "LEFT", row.icon, 5)
+  row.cost = Column(row, font, MONEY_WIDTH, "RIGHT", row.name)
+  row.value = Column(row, font, MONEY_WIDTH, "RIGHT", row.cost)
+  row.where = Column(row, font, WHERE_WIDTH, "RIGHT", row.value)
+  row.profit = Column(row, font, MONEY_WIDTH, "RIGHT", row.where)
   return row
 end
 
 local function ShowTooltip(row)
-  local data = row.data
-  if not data then return end
+  local result = row.data.result
   GameTooltip:SetOwner(row, "ANCHOR_RIGHT")
-  GameTooltip:AddLine(data.name)
-  for _, r in ipairs(data.result.reagents) do
+  GameTooltip:AddLine(row.data.name)
+  for _, r in ipairs(result.reagents) do
     local name = C_Item.GetItemNameByID(r.itemID) or ("item:" .. r.itemID)
     GameTooltip:AddDoubleLine(
       r.qty .. "x " .. name .. (r.fromVendor and " (Händler)" or ""),
       Money(r.unit and r.unit * r.qty), 1, 1, 1, 1, 1, 1)
   end
-  GameTooltip:AddDoubleLine("Materialkosten", Money(data.result.cost))
-  GameTooltip:AddDoubleLine("AH-Wert (nach 5 % Gebühr)", Money(data.result.ahValue))
-  GameTooltip:AddDoubleLine("Händler-Verkauf", Money(data.result.vendorValue))
-  GameTooltip:AddDoubleLine(
-    data.result.sellToVendor and "Gewinn (beim Händler)" or "Gewinn (im AH)",
-    Money(data.result.profit))
+  GameTooltip:AddLine(" ")
+  GameTooltip:AddDoubleLine("Kosten", Money(not result.costIncomplete and result.cost))
+  GameTooltip:AddDoubleLine("Erlös im AH (nach 5 % Gebühr)", Money(result.ahValue))
+  GameTooltip:AddDoubleLine("Erlös beim Händler", Money(result.vendorValue))
+  GameTooltip:AddDoubleLine("Gewinn", ProfitText(result.profit))
+  GameTooltip:AddLine("Klick: Rezept anzeigen", 0.5, 0.5, 0.5)
   GameTooltip:Show()
+end
+
+local function CreateListRow(index)
+  local row = CreateRow(content, "Button", "GameFontHighlightSmall")
+  row:SetPoint("TOPLEFT", 0, -(index - 1) * ROW_HEIGHT)
+  row.where:SetTextColor(0.6, 0.6, 0.6)
+  if index % 2 == 0 then
+    local stripe = row:CreateTexture(nil, "BACKGROUND")
+    stripe:SetAllPoints()
+    stripe:SetColorTexture(1, 1, 1, 0.04)
+  end
+  row:SetHighlightTexture("Interface\\QuestFrame\\UI-QuestTitleHighlight", "ADD")
+  row:SetScript("OnEnter", ShowTooltip)
+  row:SetScript("OnLeave", GameTooltip_Hide)
+  row:SetScript("OnClick", function(self) C_TradeSkillUI.OpenRecipe(self.data.recipeID) end)
+  return row
 end
 
 local function Refresh()
   local rows = ReadRecipes()
+  local profitable, anyAHPrice = 0, false
   for i, data in ipairs(rows) do
+    local result = data.result
     local row = rowFrames[i]
     if not row then
-      row = CreateRow(content)
-      row:SetPoint("TOPLEFT", 0, -(i - 1) * ROW_HEIGHT)
-      row:EnableMouse(true)
-      row:SetScript("OnEnter", ShowTooltip)
-      row:SetScript("OnLeave", GameTooltip_Hide)
+      row = CreateListRow(i)
       rowFrames[i] = row
     end
     row.data = data
+    row.icon:SetTexture(data.icon)
     row.name:SetText(data.name)
-    -- "+" = mindestens ein Material ohne Preis, die Kosten sind also zu niedrig
-    row.cost:SetText(Money(data.result.cost) .. (data.result.costIncomplete and "+" or ""))
-    -- "H" = an den Haendler verkaufen bringt mehr als das AH
-    row.value:SetText((data.result.sellToVendor and "H " or "") .. Money(data.result.value))
-    row.profit:SetText(Money(data.result.profit))
+    -- Rezepte ohne berechenbaren Gewinn treten optisch zurueck
+    local shade = result.profit and 1 or 0.5
+    row.name:SetTextColor(shade, shade, shade)
+    row.cost:SetText(Money(not result.costIncomplete and result.cost))
+    row.value:SetText(Money(result.value))
+    row.where:SetText(result.value and (result.sellToVendor and "Händler" or "AH") or "")
+    row.profit:SetText(ProfitText(result.profit))
     row:Show()
+    if result.profit and result.profit > 0 then profitable = profitable + 1 end
+    anyAHPrice = anyAHPrice or result.ahValue ~= nil
   end
   for i = #rows + 1, #rowFrames do
     rowFrames[i]:Hide()
   end
   content:SetHeight(math.max(#rows * ROW_HEIGHT, 1))
+
+  if #rows == 0 then
+    status:SetText("Keine gelernten Rezepte gefunden.")
+  elseif not anyAHPrice then
+    status:SetText("Noch keine AH-Preise: Auktionshaus öffnen und scannen.")
+  else
+    status:SetText(("Gewinn bei %d von %d Rezepten"):format(profitable, #rows))
+  end
 end
 
 -- Das Spiel meldet Listen-Aenderungen oft mehrfach hintereinander (z. B. bei jedem
@@ -157,19 +191,26 @@ local function CreateMainFrame()
   frame:SetClampedToScreen(true)
   if frame.TitleText then frame.TitleText:SetText("MoneyTalks") end
 
-  local header = CreateRow(frame)
+  local header = CreateRow(frame, "Frame", "GameFontNormalSmall")
   header:SetPoint("TOPLEFT", 14, -30)
   header.name:SetText("Rezept")
-  header.cost:SetText("Mats")
-  header.value:SetText("Verkauf")
+  header.cost:SetText("Kosten")
+  header.value:SetText("Erlös")
+  header.where:SetText("Verkauf")
   header.profit:SetText("Gewinn")
 
   local scroll = CreateFrame("ScrollFrame", nil, frame, "UIPanelScrollFrameTemplate")
   scroll:SetPoint("TOPLEFT", 14, -50)
-  scroll:SetPoint("BOTTOMRIGHT", -32, 10)
+  scroll:SetPoint("BOTTOMRIGHT", -32, 30)
   content = CreateFrame("Frame", nil, scroll)
-  content:SetSize(WIDTH - 50, 1)
+  content:SetSize(LIST_WIDTH, 1)
   scroll:SetScrollChild(content)
+
+  status = frame:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+  status:SetPoint("BOTTOMLEFT", 16, 11)
+  local legend = frame:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+  legend:SetPoint("BOTTOMRIGHT", -16, 11)
+  legend:SetText("? = Preis fehlt")
 
   -- neu rechnen, sobald Auctionator nach einem Scan neue Preise hat
   Auctionator.API.v1.RegisterForDBUpdate(ADDON, QueueRefresh)
